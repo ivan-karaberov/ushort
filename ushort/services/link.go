@@ -9,6 +9,8 @@ import (
 	"time"
 	"ushort/config"
 	"ushort/storage"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Link struct {
@@ -68,6 +70,16 @@ func GenerateRandomID(length int) string {
 	return string(id)
 }
 
+func GenerateHashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	return string(bytes), err
+}
+
+func CompareHashPassword(password string, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
 func SaveLink(ctx context.Context, cfg config.Config, url string, password string) (string, error) {
 	id := GenerateRandomID(8)
 
@@ -78,6 +90,9 @@ func SaveLink(ctx context.Context, cfg config.Config, url string, password strin
 			id = GenerateRandomID(8)
 			counter += 1
 		} else {
+			if len(password) > 0 {
+				password, _ = GenerateHashPassword(password)
+			}
 			link := Link{Id: id, Url: url, Password: password}
 			if SetInRedis(ctx, cfg, &link) {
 				return id, nil
@@ -95,7 +110,7 @@ func GetLink(ctx context.Context, cfg config.Config, id string, password string)
 		return "", fmt.Errorf("failed get link from Redis")
 	}
 	if len(link.Password) > 0 {
-		if link.Password == password {
+		if CompareHashPassword(password, link.Password) {
 			return link.Url, nil
 		} else {
 			return "nil", fmt.Errorf("invalid password")
