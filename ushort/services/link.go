@@ -88,3 +88,18 @@ func SaveLink(ctx context.Context, cfg config.Config, url string, password strin
 
 	return "", fmt.Errorf("failed to save link after 3 attempts")
 }
+
+func GetLink(ctx context.Context, cfg config.Config, id string, password string) (string, error) {
+	link := GetFromRedis(ctx, cfg, id)
+	if link == nil {
+		return "", fmt.Errorf("failed get link from Redis")
+	}
+	if len(link.Password) > 0 {
+		if link.Password == password {
+			return link.Url, nil
+		} else {
+			return "nil", fmt.Errorf("invalid password")
+		}
+	}
+	return link.Url, nil
+}
